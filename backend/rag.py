@@ -72,7 +72,17 @@ class FitnessRAG:
         vs.save_local(self.cfg.index_dir)
         return self.cfg.index_dir
 
+    def _index_files_present(self) -> bool:
+        faiss_path = os.path.join(self.cfg.index_dir, "index.faiss")
+        pkl_path = os.path.join(self.cfg.index_dir, "index.pkl")
+        return os.path.exists(faiss_path) and os.path.getsize(faiss_path) > 0 and os.path.exists(pkl_path)
+
     def _load_vectorstore(self) -> FAISS:
+        # Auto-build index if missing
+        if not self._index_files_present():
+            # Ensure directory exists and attempt build
+            os.makedirs(self.cfg.index_dir, exist_ok=True)
+            self.build_or_refresh_index()
         embeddings = OpenAIEmbeddings(model=self.cfg.embed_model)
         return FAISS.load_local(self.cfg.index_dir, embeddings, allow_dangerous_deserialization=True)
 
