@@ -1,4 +1,5 @@
 import os
+import tempfile
 from typing import List, Optional
 from dataclasses import dataclass
 
@@ -15,7 +16,8 @@ from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 
 
-DEFAULT_INDEX_DIR = os.getenv("INDEX_DIR", os.path.join("data", "index"))
+# Prefer explicit INDEX_DIR, otherwise use a writable temp dir (works on Streamlit Cloud)
+DEFAULT_INDEX_DIR = os.getenv("INDEX_DIR") or os.path.join(tempfile.gettempdir(), "fitness_faiss_index")
 EMBED_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 CHAT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
