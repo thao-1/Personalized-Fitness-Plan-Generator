@@ -37,6 +37,17 @@ if LOCAL_MODE:
         st.session_state.planner = Planner()
     if "rag" not in st.session_state:
         st.session_state.rag = FitnessRAG()
+    # Auto-build index if missing, with a quick check
+    try:
+        _idx_dir = st.session_state.rag.cfg.index_dir
+        _faiss = os.path.join(_idx_dir, "index.faiss")
+        _pkl = os.path.join(_idx_dir, "index.pkl")
+        if not (os.path.exists(_faiss) and os.path.exists(_pkl)):
+            with st.spinner("Preparing knowledge index (first-time setup)..."):
+                st.session_state.rag.build_or_refresh_index()
+                st.toast("Index ready", icon="✅")
+    except Exception as _e:
+        st.warning(f"Index not ready yet: {_e}")
 
 st.set_page_config(page_title="Personalized Fitness Plan Generator", page_icon="💪", layout="wide")
 
@@ -48,6 +59,28 @@ with st.sidebar:
     mode_label = "Local (in-app)" if LOCAL_MODE else f"Remote: {BACKEND_URL}"
     st.write(f"Mode: {mode_label}")
     if LOCAL_MODE:
+        try:
+            _idx_dir = st.session_state.rag.cfg.index_dir
+            st.caption(f"Index dir: {_idx_dir}")
+            cols = st.columns(2)
+            with cols[0]:
+                if st.button("Build Index", key="sidebar_build"):
+                    try:
+                        with st.spinner("Building index..."):
+                            st.session_state.rag.build_or_refresh_index()
+                            st.success("Index ready")
+                    except Exception as e:
+                        st.error(f"Build failed: {e}")
+            with cols[1]:
+                if st.button("Check Index", key="sidebar_check"):
+                    _faiss = os.path.join(_idx_dir, "index.faiss")
+                    _pkl = os.path.join(_idx_dir, "index.pkl")
+                    st.write({
+                        "exists_faiss": os.path.exists(_faiss),
+                        "exists_pkl": os.path.exists(_pkl),
+                    })
+        except Exception:
+            pass
         if st.button("Health Check"):
             st.success("Local mode OK: running planner and RAG in-process")
     else:
