@@ -17,6 +17,18 @@ if LOCAL_MODE:
     repo_root = Path(__file__).resolve().parents[1]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
+    # Load secrets into environment for SDKs that read os.environ
+    try:
+        if "OPENAI_API_KEY" in st.secrets:
+            os.environ["OPENAI_API_KEY"] = str(st.secrets["OPENAI_API_KEY"]).strip()
+        if "INDEX_DIR" in st.secrets:
+            os.environ["INDEX_DIR"] = str(st.secrets["INDEX_DIR"]).strip()
+        if "OPENAI_MODEL" in st.secrets:
+            os.environ["OPENAI_MODEL"] = str(st.secrets["OPENAI_MODEL"]).strip()
+        if "EMBEDDING_MODEL" in st.secrets:
+            os.environ["EMBEDDING_MODEL"] = str(st.secrets["EMBEDDING_MODEL"]).strip()
+    except Exception:
+        pass
     # Lazy import to avoid errors if modules are missing during remote mode
     from backend.planner import Planner
     from backend.models import PlanRequest
@@ -157,7 +169,7 @@ with col_a:
         try:
             with st.spinner("Building index... this may take up to a minute on first run"):
                 if LOCAL_MODE:
-                    idx = st.session_state.rag.build_index()
+                    idx = st.session_state.rag.build_or_refresh_index()
                     st.success(f"Index ready: {idx}")
                 else:
                     r = requests.post(f"{BACKEND_URL}/rag/build-index", timeout=120)
