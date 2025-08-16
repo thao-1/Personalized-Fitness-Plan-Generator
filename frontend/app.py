@@ -1,8 +1,10 @@
 import os
+import sys
 import requests
 import streamlit as st
 from typing import List, Dict, Any
 from dotenv import load_dotenv
+from pathlib import Path
 
 load_dotenv()
 
@@ -11,6 +13,10 @@ BACKEND_URL = os.getenv("BACKEND_URL", "").strip()
 LOCAL_MODE = BACKEND_URL == ""
 
 if LOCAL_MODE:
+    # Ensure project root is on sys.path when running on Streamlit Cloud
+    repo_root = Path(__file__).resolve().parents[1]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
     # Lazy import to avoid errors if modules are missing during remote mode
     from backend.planner import Planner
     from backend.models import PlanRequest
