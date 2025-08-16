@@ -29,7 +29,7 @@ if LOCAL_MODE:
             os.environ["EMBEDDING_MODEL"] = str(st.secrets["EMBEDDING_MODEL"]).strip()
     except Exception:
         pass
-    # Lazy import to avoid errors if modules are missing during remote mode
+    # Import to avoid errors if modules are missing during remote mode
     from backend.planner import Planner
     from backend.models import PlanRequest
     from backend.rag import FitnessRAG
