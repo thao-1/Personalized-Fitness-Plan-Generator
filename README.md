@@ -1,5 +1,7 @@
 # Personalized Fitness Plan Generator
 
+URL: https://thao-1-personalized-fitness-plan-generator.streamlit.app/
+
 An AI-driven app that generates a weekly workout plan tailored to a user's goals, experience, available equipment, and constraints, using a simple rule-based expert system over the `megaGymDataset.csv`.
 
 - Front-end: Streamlit
