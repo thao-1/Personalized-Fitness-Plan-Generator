@@ -6,7 +6,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
+# If BACKEND_URL is not set, run in local mode (call Python modules directly)
+BACKEND_URL = os.getenv("BACKEND_URL", "").strip()
+LOCAL_MODE = BACKEND_URL == ""
+
+if LOCAL_MODE:
+    # Lazy import to avoid errors if modules are missing during remote mode
+    from backend.planner import Planner
+    from backend.models import PlanRequest
+    from backend.rag import FitnessRAG
+    if "planner" not in st.session_state:
+        st.session_state.planner = Planner()
+    if "rag" not in st.session_state:
+        st.session_state.rag = FitnessRAG()
 
 st.set_page_config(page_title="Personalized Fitness Plan Generator", page_icon="💪", layout="wide")
 
@@ -15,13 +27,18 @@ st.caption("Generate a weekly training plan tailored to your goals, experience, 
 
 with st.sidebar:
     st.header("Configuration")
-    st.write(f"Backend: {BACKEND_URL}")
-    if st.button("Health Check"):
-        try:
-            r = requests.get(f"{BACKEND_URL}/health", timeout=5)
-            st.success(f"API OK: {r.json()}")
-        except Exception as e:
-            st.error(f"API not reachable: {e}")
+    mode_label = "Local (in-app)" if LOCAL_MODE else f"Remote: {BACKEND_URL}"
+    st.write(f"Mode: {mode_label}")
+    if LOCAL_MODE:
+        if st.button("Health Check"):
+            st.success("Local mode OK: running planner and RAG in-process")
+    else:
+        if st.button("Health Check"):
+            try:
+                r = requests.get(f"{BACKEND_URL}/health", timeout=5)
+                st.success(f"API OK: {r.json()}")
+            except Exception as e:
+                st.error(f"API not reachable: {e}")
 
 st.subheader("Tell us about you")
 col1, col2, col3 = st.columns(3)
@@ -59,9 +76,15 @@ if st.button("Generate Plan", type="primary"):
     }
     try:
         with st.spinner("Generating your plan..."):
-            resp = requests.post(f"{BACKEND_URL}/recommend-plan", json=payload, timeout=30)
-            resp.raise_for_status()
-            data = resp.json()
+            if LOCAL_MODE:
+                req_model = PlanRequest(**payload)
+                plan = st.session_state.planner.generate_plan(req_model)
+                # Pydantic model -> dict
+                data = plan.dict() if hasattr(plan, "dict") else plan
+            else:
+                resp = requests.post(f"{BACKEND_URL}/recommend-plan", json=payload, timeout=30)
+                resp.raise_for_status()
+                data = resp.json()
     except requests.HTTPError as e:
         st.error(f"Server error: {e.response.text}")
         st.stop()
@@ -127,9 +150,13 @@ with col_a:
     if st.button("Build/Refresh Index", help="Creates the FAISS index using OpenAI embeddings"):
         try:
             with st.spinner("Building index... this may take up to a minute on first run"):
-                r = requests.post(f"{BACKEND_URL}/rag/build-index", timeout=120)
-                r.raise_for_status()
-                st.success(f"Index ready: {r.json().get('index_dir')}")
+                if LOCAL_MODE:
+                    idx = st.session_state.rag.build_index()
+                    st.success(f"Index ready: {idx}")
+                else:
+                    r = requests.post(f"{BACKEND_URL}/rag/build-index", timeout=120)
+                    r.raise_for_status()
+                    st.success(f"Index ready: {r.json().get('index_dir')}")
         except requests.HTTPError as e:
             st.error(f"Server error: {e.response.text}")
         except Exception as e:
@@ -143,9 +170,13 @@ with col_b:
         else:
             try:
                 with st.spinner("Thinking..."):
-                    r = requests.post(f"{BACKEND_URL}/rag/ask", json={"question": question, "k": k}, timeout=60)
-                    r.raise_for_status()
-                    st.write(r.json().get("answer", ""))
+                    if LOCAL_MODE:
+                        ans = st.session_state.rag.qa(question, k=k)
+                        st.write(ans)
+                    else:
+                        r = requests.post(f"{BACKEND_URL}/rag/ask", json={"question": question, "k": k}, timeout=60)
+                        r.raise_for_status()
+                        st.write(r.json().get("answer", ""))
             except requests.HTTPError as e:
                 st.error(f"Server error: {e.response.text}")
             except Exception as e:
